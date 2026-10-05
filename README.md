@@ -1,6 +1,6 @@
 # Connect your email to Basstok
 
-Keep your address. Receive new mail and attachments beside your messages in
+Keep your address. Read new mail, write emails and reply beside your messages in
 [Basstok](https://basstok.com/), on Web, iPhone, iPad and Android.
 
 This guide covers the supported email providers, protocols and setup choices.
@@ -12,18 +12,20 @@ Microsoft public connection setup and live acceptance remain outstanding.
 
 | Your email | Basstok's approach | Sign-in or setup | Current boundary |
 | --- | --- | --- | --- |
-| Apple iCloud Mail | Encrypted IMAP | Apple app-specific password; incoming settings suggested automatically | Implemented receiving path; requires your own authorized mailbox and a delivery test |
-| Gmail / Google Workspace | Gmail API, not Gmail IMAP | Google OAuth consent with read-only mail permission | Implemented; provider configuration, public verification and live mailbox acceptance are not complete |
-| Outlook.com / Microsoft 365 | Microsoft Graph, not password-based Outlook IMAP | Microsoft OAuth consent | Implemented; provider configuration, applicable consent and live mailbox acceptance are not complete |
-| Other compatible mailboxes | IMAP over TLS | Provider-issued password or app password and incoming server settings | Password-capable, publicly reachable encrypted IMAP only; no blanket compatibility claim |
+| Apple iCloud Mail | Encrypted IMAP for receiving; SMTP for sending | Apple app-specific password; incoming settings suggested automatically, outgoing settings entered separately | Requires your authorized mailbox and a delivery test |
+| Gmail / Google Workspace | Gmail API, not Gmail IMAP | Google consent for reading and sending; only granted permissions apply | Implemented; provider configuration, public verification and live mailbox acceptance are not complete |
+| Outlook.com / Microsoft 365 | Microsoft Graph, not password-based Outlook IMAP | Microsoft consent for reading and sending; only granted permissions apply | Implemented; provider configuration, applicable consent and live mailbox acceptance are not complete |
+| Other compatible mailboxes | Encrypted IMAP for receiving; SMTP for sending | Provider-issued password or app password and the provider's server settings | Compatible password-based connections; no blanket compatibility claim |
+| Amazon SES | Regional SMTP service for sending | SES SMTP credentials and a verified sending identity | Sending only; your region, sandbox, recipient and sending-limit requirements still apply |
 | Mail forwarded from an existing address | Incoming SMTP to a Basstok Chat address | Enable a receiving address, then configure forwarding at your email provider | Does not require moving the domain or connecting mailbox credentials |
 | An address on a domain you control | Incoming SMTP through your domain's MX records | Verify the exact address with a DNS TXT record, then deliberately change mail routing | Only connected destinations receive mail; no catch-all |
-| Basstok account and notification email | Default delivery or an Admin-selected SMTP sender | Optional custom SMTP credentials and sender-domain setup | Not personal email composition or replies from a connected mailbox |
+| Basstok account and notification email | Separate service delivery; optional Admin-selected notification SMTP | Account security and optional notifications keep their own delivery rules | Never used as a fallback for personal email |
 
-**Receiving only for connected mailboxes.** Basstok currently does not send or
-reply as your connected address, import your entire historical mailbox, or write
-read/deleted state back to your email provider. Connecting email is not Basstok
-login verification or Admin activation.
+An inbox connection receives new mail without importing the whole historical
+mailbox or changing read/deleted state at your provider. Sending uses an
+authorized Google/Microsoft connection or your explicit outgoing SMTP settings.
+Receiving permission alone is not sending permission. Connecting email is not
+Basstok login verification or Admin activation.
 
 ## Start with your inbox
 
@@ -62,14 +64,28 @@ Create the password through your Apple Account and enter it only in Basstok's
 authenticated connection form. This is the IMAP/app-password connection, not an
 Apple sign-in integration. See [Apple's current iCloud Mail settings](https://support.apple.com/102525).
 
-Basstok does not automatically configure iCloud SMTP or gain permission to send
-from your iCloud address when you connect receiving.
+To send, open **Write an email → Outgoing server settings** and use:
+
+| Setting | Value |
+| --- | --- |
+| Outgoing server | `smtp.mail.me.com` |
+| Port | `587` |
+| Connection security | `STARTTLS` |
+| Username | Your full iCloud Mail email address |
+| App password | The Apple app-specific password used for incoming mail |
+
+Use an address Apple permits that account to send from. Receiving setup does not
+automatically save these outgoing settings. These values follow
+[Apple's mail-server instructions](https://support.apple.com/en-us/102525);
+an actual send and receipt still establish whether your account works.
 
 ## Gmail and Google Workspace
 
 Basstok uses the **Gmail API with Google OAuth**, rather than requesting full-mail
-IMAP authorization. The requested mail scope is `gmail.readonly`; it does not
-permit modifying or sending mail. See [Google's scope reference](https://developers.google.com/workspace/gmail/api/auth/scopes).
+IMAP authorization. It requests `gmail.readonly` for receiving and `gmail.send`
+for sending. A read-only grant keeps receiving available but does not enable
+sending. Neither scope permits deleting mail or changing its read state. See
+[Google's scope reference](https://developers.google.com/workspace/gmail/api/auth/scopes).
 
 - Recognized Gmail addresses select Google. A custom Workspace address can choose
   Google when that connection is available.
@@ -88,9 +104,11 @@ implemented connection or a successful development check is not Google approval.
 ## Outlook.com and Microsoft 365
 
 Basstok uses **Microsoft Graph with Microsoft OAuth**. It requests delegated
-`Mail.Read`, `User.Read` and offline access, not `Mail.Send`, mail modification or
-application-wide mailbox access. Microsoft's [permission reference](https://learn.microsoft.com/en-us/graph/permissions-reference#mailread)
-describes the delegated mail permission.
+`Mail.Read`, `Mail.Send`, `User.Read` and offline access, not application-wide
+mailbox access. Sending becomes available only when `Mail.Send` was actually
+granted; a receiving connection alone is insufficient. Microsoft's
+[permission reference](https://learn.microsoft.com/en-us/graph/permissions-reference#mailread)
+describes these permissions.
 
 - Outlook, Hotmail, Live and MSN addresses select Microsoft. A custom Microsoft
   365 address can choose it when configured.
@@ -121,6 +139,11 @@ Receiving checks run periodically, with an explicit check action available in
 settings. Provider push subscriptions and IMAP IDLE are not part of the current
 connection; there is no instant-delivery guarantee. If mailbox identity or access
 changes, setup may require attention rather than silently reimporting old mail.
+
+IMAP does not send email. Use the same provider's documented outgoing SMTP
+settings separately; receiving credentials are not automatically reused for
+submission. Basstok keeps its sent record in the Chat, without using IMAP to
+append a copy to a remote Sent folder.
 
 ## Forward an existing address
 
@@ -159,12 +182,50 @@ Changing MX does not move your website or authorize sending mail from the domain
 A verified address is not proof of public delivery. Restore your previous mail
 routing before disconnecting if other mail should return to the old provider.
 
-## SMTP sending: what it does and does not do
+## Write an email or reply
 
-Basstok already sends its required account, recovery and security email, plus
-appropriate optional notification email. These do not require connecting a
-personal mailbox. An Admin can optionally select an external SMTP sender for
-their account/community's delivery.
+1. In a Chat you created, choose **Write an email**, or **Reply by email** on an
+   incoming email. Review the recipient and subject, then write your message.
+2. A connected Google/Microsoft mailbox with sending permission supplies the
+   sender. Otherwise choose **Connect email** or **Outgoing server settings**.
+   Your open draft stays in place while you connect.
+3. If using SMTP, enter the address, server and credentials supplied by your
+   provider, then **Save sending connection**. Explicit SMTP takes precedence
+   over a connected mailbox; inspect the selected sender before sending.
+4. Choose **Send email**. The resulting email appears in that Chat with its
+   recipient, subject, text and sending status.
+
+Only the Chat's current human creator can connect sending or send through it.
+Admin status alone does not grant access, and other participants cannot use the
+creator's credentials. They can read sent messages within their authorized Chat
+history. Incoming sender addresses are not authenticated identities: check the
+reply recipient before sending sensitive information.
+
+### Understand the result
+
+- **Accepted by your email provider:** the service accepted the submission.
+  It does not prove delivery, inbox placement or that the recipient read it.
+- **Email was not sent:** the attempt was rejected. Fix the reported problem
+  before choosing to send a new attempt.
+- **Sending not confirmed:** it may already have been sent. Use **Check send
+  result** to check the same attempt, not send another copy. Check your provider's
+  sent mail or other delivery records where available before starting over.
+
+An uncertain request keeps its original recipient, text and identity while you
+check it. Disconnecting the sender does not make that check resend. There are
+no automatic resends; starting a new attempt after an unknown result can create
+a duplicate.
+
+Drafts are local, not synchronized between devices. Native apps retain the open
+draft in memory and ask before discarding it; closing the app can lose it. Web
+keeps bounded drafts in the current tab for up to 24 hours and clears them on
+sign-out. Sent history, unlike an unfinished draft, remains in the Chat.
+
+Current sending supports **one recipient, plain text up to 16 KiB, and a subject
+up to 512 UTF-8 bytes**. Outgoing attachments, CC/BCC and scheduling are not yet
+available. Receiving attachments is a separate capability.
+
+## Outgoing SMTP and Amazon SES
 
 Supply the exact sender address, public SMTP hostname, port, credentials and
 security mode. Supported modes are implicit TLS or mandatory STARTTLS before
@@ -172,7 +233,7 @@ authentication; supported credential mechanisms are SMTP AUTH PLAIN and LOGIN
 over that encrypted connection. A provider requiring SMTP OAuth alone does not
 fit this credential-based setup. Do not disable TLS to make it connect.
 
-The connection check authenticates and checks the sender, but **does not submit
+Saving the connection authenticates and checks the sender, but **does not submit
 a test email**. It does not prove recipient delivery, spam-folder placement or
 sender-domain approval. Follow your SMTP provider's setup instructions:
 
@@ -182,9 +243,25 @@ sender-domain approval. Follow your SMTP provider's setup instructions:
 - **DMARC:** review the domain's existing policy and alignment; do not blindly
   replace it while connecting another sender.
 
-Basstok shows the relevant DNS checks alongside SMTP setup. Verify actual
-delivery before relying on the new sender. A successful SMTP check does not add
-an email compose/reply feature or an arbitrary outbound-email API.
+For **Amazon SES**, select the region's SMTP endpoint and use credentials created
+for the SES SMTP interface, not an AWS console password or a general API key.
+Your sending identity must be verified in that region. In the SES sandbox,
+recipients also need verification unless you use its mailbox simulator; moving
+out of the sandbox and any applicable quotas remain your account's responsibility.
+See [SES SMTP setup](https://docs.aws.amazon.com/ses/latest/dg/send-email-smtp.html)
+and [sandbox restrictions](https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html).
+SES provides outgoing service here, not a connected inbox.
+
+Verify actual delivery before relying on any new sender. A successful SMTP login
+is not a delivery test, and an address's MX records do not authorize sending.
+
+## Account, security and notification email
+
+Basstok's required account, recovery and security mail uses its separate service
+delivery. An Admin can choose a custom SMTP sender for eligible notification
+delivery, with sender-domain DNS checks beside that administrative setup.
+That setting is not personal sending, never overrides the security transport,
+and is not a fallback when your personal connection is missing.
 
 Optional email preferences remain independent of required security/account email.
 Received external email does not trigger another optional email alert, avoiding
@@ -222,13 +299,23 @@ response and authorization contracts. Key surfaces include:
 | Microsoft consent | `/api/v1/chats/{chatId}/mailbox/microsoft` |
 | Generated receiving address | `/api/v1/chats/{chatId}/incoming-email` |
 | Exact custom-domain receiving address | `/api/v1/chats/{chatId}/incoming-email/address` |
-| Admin SMTP sender | `/api/v1/organization/email` |
+| Personal sending status and SMTP selection | `/api/v1/chats/{chatId}/email/sending` |
+| Explicit personal send or reply | `/api/v1/chats/{chatId}/email/send` |
+| Admin notification SMTP sender | `/api/v1/organization/email` |
 | Sender-domain DNS checks | `/api/v1/organization/email/dns-check` |
 
-Receiving setup requires the current human Chat creator; SMTP sender setup
-requires Admin authority. Connecting a mailbox neither authenticates a Basstok
-session nor activates administration. Apps must use their allowed scopes and
-Chat access; they cannot use a mailbox consent as a login or permission bypass.
+Personal receiving/sending setup and personal sends require the current human
+Chat creator and participation. Only the separate Organization notification SMTP
+setup requires Admin authority. Connecting a mailbox neither authenticates a
+Basstok session nor activates administration. These personal operations do not
+accept delegated App authority; an App cannot use mailbox consent to bypass its
+scopes or Chat access.
+
+The send operation requires an `Idempotency-Key` for each explicit attempt.
+Keep its exact connection, recipient, subject, body and optional reply reference
+when checking an uncertain result. Reusing that key with different input fails;
+an exact repeat returns the saved result rather than resending. Use the published
+contract for field names, limits, errors and session requirements.
 
 This repository documents external email connections and user-visible behavior.
 It does not publish deployment credentials, private implementation or an
